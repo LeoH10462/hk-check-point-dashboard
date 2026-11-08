@@ -32,6 +32,46 @@ powershell -ExecutionPolicy Bypass -File .\scripts\import-traffic.ps1
 
 Open the [traveller dashboard](http://127.0.0.1:8000/) or the [operations dashboard](http://127.0.0.1:8000/operations). The first build downloads Docker images and Composer dependencies. On the same computer, once the images and data are ready, use `docker compose up -d --no-build --pull never` to start the existing deployment. Use `docker compose down` to stop it and retain the MySQL data.
 
+## Run locally on macOS
+
+Start Docker Desktop for Mac. In Terminal, go to the project folder containing `compose.yaml`. On the first setup, run:
+
+```sh
+if [ ! -f .env ]; then cp .env.example .env; fi
+if grep -q '^APP_KEY=$' .env; then
+  key=$(openssl rand -base64 32) &&
+    sed "s|^APP_KEY=$|APP_KEY=base64:$key|" .env > .env.tmp &&
+    mv .env.tmp .env
+fi
+nano .env
+```
+
+Set `OPERATOR_PASSWORD` to at least 12 characters. The default account is `operator`. Save with **Ctrl+O**, press **Enter**, then exit with **Ctrl+X**.
+
+```sh
+docker compose up -d --build
+docker compose ps
+```
+
+Once the containers are running, run the following from the same directory to download and import the official data:
+
+```sh
+(
+  set -e
+  mkdir -p data
+  base='https://www.immd.gov.hk/opendata/eng/transport/immigration_clearance'
+  curl -fsSL "$base/statistics_on_daily_passenger_traffic.csv" -o data/daily.csv
+  curl -fsSL "$base/statistics_passenger_traffic_festival_periods.csv" -o data/festival.csv
+
+  for source in daily festival; do
+    docker compose cp "data/$source.csv" "app:/tmp/$source.csv"
+    docker compose exec -T app php artisan traffic:import "/tmp/$source.csv" "$source"
+  done
+)
+```
+
+Open the [traveller dashboard](http://127.0.0.1:8000/) or the [operations dashboard](http://127.0.0.1:8000/operations). To start the existing deployment again on this Mac, run `docker compose up -d --no-build --pull never`. Run `docker compose down` to stop it and retain the database.
+
 ### Upgrade an existing database
 
 After updating the application, run `powershell -ExecutionPolicy Bypass -File .\scripts\upgrade-utf8.ps1` with the Compose project running. This repairs Chinese seed text and applies checkpoint name updates while preserving imported traffic, bookings and simulation scenarios.

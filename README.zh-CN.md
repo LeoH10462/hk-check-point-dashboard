@@ -32,6 +32,46 @@ powershell -ExecutionPolicy Bypass -File .\scripts\import-traffic.ps1
 
 打开[旅客端](http://127.0.0.1:8000/)或[运营端](http://127.0.0.1:8000/operations)。首次构建会下载 Docker 镜像和 Composer 依赖。同一台电脑准备好镜像和数据后，可用 `docker compose up -d --no-build --pull never` 启动现有部署。运行 `docker compose down` 可停止服务并保留 MySQL 数据。
 
+## 在 macOS 本机运行
+
+启动 Docker Desktop for Mac。在终端中进入包含 `compose.yaml` 的项目目录。首次配置时运行：
+
+```sh
+if [ ! -f .env ]; then cp .env.example .env; fi
+if grep -q '^APP_KEY=$' .env; then
+  key=$(openssl rand -base64 32) &&
+    sed "s|^APP_KEY=$|APP_KEY=base64:$key|" .env > .env.tmp &&
+    mv .env.tmp .env
+fi
+nano .env
+```
+
+将 `OPERATOR_PASSWORD` 设置为至少 12 个字符。默认账号是 `operator`。按 **Ctrl+O**，再按 **Enter** 保存，最后按 **Ctrl+X** 退出。
+
+```sh
+docker compose up -d --build
+docker compose ps
+```
+
+容器启动后，在同一目录运行以下命令，下载并导入官方数据：
+
+```sh
+(
+  set -e
+  mkdir -p data
+  base='https://www.immd.gov.hk/opendata/eng/transport/immigration_clearance'
+  curl -fsSL "$base/statistics_on_daily_passenger_traffic.csv" -o data/daily.csv
+  curl -fsSL "$base/statistics_passenger_traffic_festival_periods.csv" -o data/festival.csv
+
+  for source in daily festival; do
+    docker compose cp "data/$source.csv" "app:/tmp/$source.csv"
+    docker compose exec -T app php artisan traffic:import "/tmp/$source.csv" "$source"
+  done
+)
+```
+
+打开[旅客端](http://127.0.0.1:8000/)或[运营端](http://127.0.0.1:8000/operations)。以后在同一台 Mac 上启动现有部署时，可运行 `docker compose up -d --no-build --pull never`。运行 `docker compose down` 可停止服务并保留数据库。
+
 ### 升级现有数据库
 
 更新应用后，在 Compose 项目运行时执行 `powershell -ExecutionPolicy Bypass -File .\scripts\upgrade-utf8.ps1`，修复早期版本的中文初始数据并应用口岸名称更新。已导入的客流、预约和模拟情景会保留。
