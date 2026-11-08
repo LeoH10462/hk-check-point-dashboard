@@ -14,10 +14,10 @@
 <meta name="csrf-token" content="{{ csrf_token() }}">
 <title>BorderFlow · {{ $operator ? $t('營運控制台') : $t('口岸出行') }}</title>
 <script>window.borderflowTranslations = {{ Illuminate\Support\Js::from($translations) }};</script>
-<link rel="stylesheet" href="/style.css?v=2"><script src="/app.js" defer></script>
+<link rel="stylesheet" href="/style.css?v=3"><script src="/app.js" defer></script>
 </head>
 <body data-detail="{{ $detailCode ?? '' }}" data-operator="{{ $operator ? '1' : '0' }}" data-session="{{ session('operator') ? '1' : '0' }}">
-<header><a class="brand" href="/"><span>↗</span> BorderFlow</a><nav><a href="/">{{ $t('旅客出行') }}</a><a href="/operations">{{ $t('營運控制台') }}</a><span class="language" aria-label="Language"><a href="?lang=zh-HK" hreflang="zh-HK" @if($locale === 'zh-HK') aria-current="true" @endif>CN</a> | <a href="?lang=en" hreflang="en" @if($locale === 'en') aria-current="true" @endif>EN</a></span></nav></header>
+<header><a class="brand" href="/"><img src="/logo_03_orbit_globe.png" alt="" width="42" height="42"> BorderFlow</a><nav><a href="/">{{ $t('旅客出行') }}</a><a href="/operations">{{ $t('營運控制台') }}</a><span class="language" aria-label="Language"><a href="?lang=zh-HK" hreflang="zh-HK" @if($locale === 'zh-HK') aria-current="true" @endif>CN</a> | <a href="?lang=en" hreflang="en" @if($locale === 'en') aria-current="true" @endif>EN</a></span></nav></header>
 <main>
 <section class="hero"><div class="eyebrow">HONG KONG · BORDER INTELLIGENCE</div>
 <h1>{{ $operator ? $t('口岸營運控制台') : $t('掌握口岸情況，安排跨境行程') }}</h1>
