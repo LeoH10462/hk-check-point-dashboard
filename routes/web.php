@@ -12,7 +12,7 @@ Route::get('/operations/checkpoints/{code}', function (string $code) {
     if (!session('operator')) {
         return redirect('/operations');
     }
-    abort_unless(DB::table('checkpoint')->where('code',$code)->exists(),404);
+    abort_unless(DB::table('checkpoint')->where('code',$code)->where('code','<>','LSC')->exists(),404);
     return response()->view('dashboard',['operator'=>true,'detailCode'=>$code])->header('Cache-Control','no-store');
 });
 Route::post('/api/login', function (Request $request) {
@@ -46,7 +46,7 @@ Route::get('/api/checkpoints', function (Request $request) {
         $official = null;
     }
     $field = $input['direction'] === 'Arrival' ? 'arrQueue' : 'depQueue';
-    $points = DB::table('checkpoint')->whereNotNull('transport')->orderBy('code')->get();
+    $points = DB::table('checkpoint')->whereNotNull('transport')->where('code','<>','LSC')->orderBy('code')->get();
     foreach ($points as $point) {
         unset($point->lanes);
         $point->status = $official['data'][$point->code][$field] ?? null;
@@ -54,7 +54,7 @@ Route::get('/api/checkpoints', function (Request $request) {
     return ['retrieved'=>$official['retrieved'] ?? null,'points'=>$points];
 });
 Route::get('/api/history', function (Request $request) {
-    $data = $request->validate(['code'=>'required|exists:checkpoint,code','direction'=>'required|in:Arrival,Departure']);
+    $data = $request->validate(['code'=>'required|exists:checkpoint,code|not_in:LSC','direction'=>'required|in:Arrival,Departure']);
     return DB::table('daily_traffic')->where('checkpoint_code',$data['code'])->where('direction',$data['direction'])
         ->orderByDesc('day')->limit(28)->get(['day','total','source'])->reverse()->values();
 });
@@ -69,14 +69,14 @@ Route::middleware(\App\OperatorOnly::class)->prefix('/api/ops')->group(function 
     Route::get('/travellers/{id}', function (int $id) {
         $traveller = DB::table('traveller')->where('id',$id)->first();
         abort_unless($traveller,404);
-        $crossings = DB::table('crossing')->where('traveller_id',$id);
+        $crossings = DB::table('crossing')->where('traveller_id',$id)->where('checkpoint_code','<>','LSC');
         return ['profile'=>$traveller,'count'=>(clone $crossings)->count(),
-            'crossings'=>$crossings->join('checkpoint','checkpoint.code','=','crossing.checkpoint_code')
+            'crossings'=>$crossings->join('checkpoint','checkpoint.code','=','crossing.checkpoint_code')->where('checkpoint.code','<>','LSC')
                 ->orderByDesc('occurred_at')->limit(100)->get(['checkpoint.name','checkpoint.chinese','occurred_at','direction'])];
     })->whereNumber('id');
-    Route::get('/checkpoints', fn() => DB::table('checkpoint')->orderBy('name')->get(['code','name','chinese']));
+    Route::get('/checkpoints', fn() => DB::table('checkpoint')->where('code','<>','LSC')->orderBy('name')->get(['code','name','chinese']));
     Route::get('/checkpoints/{code}/minute', function (string $code) {
-        $point = DB::table('checkpoint')->where('code',$code)->first();
+        $point = DB::table('checkpoint')->where('code',$code)->where('code','<>','LSC')->first();
         abort_unless($point,404);
         $minute = now()->startOfMinute();
         $stamp = $minute->format('Y-m-d H:i');
@@ -85,7 +85,7 @@ Route::middleware(\App\OperatorOnly::class)->prefix('/api/ops')->group(function 
             'departures'=>crc32($code.$stamp.'departure') % ($point->lanes * 4 + 1)];
     });
     Route::get('/checkpoints/{code}/details', function (string $code) {
-        $point = DB::table('checkpoint')->where('code',$code)->first(['code','name','chinese']);
+        $point = DB::table('checkpoint')->where('code',$code)->where('code','<>','LSC')->first(['code','name','chinese']);
         abort_unless($point,404);
         $today = now()->startOfDay();
         $history = DB::table('daily_traffic')->where('checkpoint_code',$code)->groupBy('day')
@@ -117,7 +117,7 @@ Route::middleware(\App\OperatorOnly::class)->prefix('/api/ops')->group(function 
         $input = $request->validate(['code'=>'nullable|exists:checkpoint,code','day'=>'nullable|date_format:Y-m-d',
             'direction'=>'nullable|in:Arrival,Departure']);
         $query = DB::table('crossing as x')->join('traveller as t','t.id','=','x.traveller_id')
-            ->join('checkpoint as c','c.code','=','x.checkpoint_code');
+            ->join('checkpoint as c','c.code','=','x.checkpoint_code')->where('c.code','<>','LSC');
         if (!empty($input['code'])) {
             $query->where('c.code',$input['code']);
         }
@@ -132,12 +132,12 @@ Route::middleware(\App\OperatorOnly::class)->prefix('/api/ops')->group(function 
     Route::get('/statistics', function () {
         $day = DB::table('daily_traffic')->max('day');
         return ['day'=>$day, 'rows'=>DB::table('daily_traffic as t')->join('checkpoint as c','c.code','=','t.checkpoint_code')
-            ->where('t.day',$day)->groupBy('c.code','c.name','c.chinese')
+            ->where('t.day',$day)->where('c.code','<>','LSC')->groupBy('c.code','c.name','c.chinese')
             ->selectRaw("c.code, c.name, c.chinese, SUM(IF(t.direction='Arrival',t.total,0)) AS arrivals, SUM(IF(t.direction='Departure',t.total,0)) AS departures")
             ->orderByDesc('arrivals')->get()];
     });
     Route::post('/simulations', function (Request $request) {
-        $data = $request->validate(['code'=>'required|exists:checkpoint,code','base'=>'required|integer|min:0|max:1500',
+        $data = $request->validate(['code'=>'required|exists:checkpoint,code|not_in:LSC','base'=>'required|integer|min:0|max:1500',
             'increase'=>'required|integer|min:0|max:1500','ramp'=>'required|integer|min:1|max:60',
             'lanes'=>'required|integer|min:1|max:100','initial'=>'required|integer|min:0|max:10000']);
         $series = QueueModel::run($data['base'],$data['increase'],$data['ramp'],$data['lanes'],$data['initial']);
@@ -147,7 +147,7 @@ Route::middleware(\App\OperatorOnly::class)->prefix('/api/ops')->group(function 
             'parameters'=>json_encode($data),'results'=>json_encode($result)]);
         return $result;
     });
-    Route::get('/simulations', fn() => DB::table('simulation')->orderByDesc('id')->limit(15)->get());
+    Route::get('/simulations', fn() => DB::table('simulation')->where('checkpoint_code','<>','LSC')->orderByDesc('id')->limit(15)->get());
     Route::get('/slots', function () {
         // Idempotent fixture setup for the next twelve dates.
         return DB::transaction(function () {
