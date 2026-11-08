@@ -4,6 +4,32 @@
 
 BorderFlow is a CityU database application project. The traveller dashboard shows official checkpoint wait categories, transport connections and historical passenger traffic. The password-protected operations dashboard adds demo traveller records, vehicle quota bookings, queue simulations and MySQL execution plans.
 
+## Dashboard previews
+
+### Traveller dashboard
+
+![Traveller dashboard](img/Traveller%20dashboard.png)
+
+### Operations overview
+
+![Operations overview](img/Operations%20dashboard%201.png)
+
+### Historical passenger traffic
+
+![Historical passenger traffic](img/Operations%20dashboard%202.png)
+
+### Simulated minute-level flow and official daily statistics
+
+![Simulated minute-level flow and official daily statistics](img/Operations%20dashboard%203.png)
+
+### Demo traveller lookup, crossing records and queue simulation
+
+![Demo traveller lookup, crossing records and queue simulation](img/Operations%20dashboard%204.png)
+
+### Vehicle quota bookings and database lab
+
+![Vehicle quota bookings and database lab](img/Operations%20dashboard%205.png)
+
 ## Run locally on Windows
 
 Start Docker Desktop. Open PowerShell in the project folder that contains `compose.yaml` and run:

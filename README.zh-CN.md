@@ -4,6 +4,32 @@
 
 BorderFlow 是香港城市大学的数据库应用课程项目。旅客端展示官方等候等级、交通接驳与历史客流。需要登录的运营端提供演示旅客记录、车辆配额预约、排队模拟和 MySQL 执行计划。
 
+## 界面预览
+
+### 旅客端
+
+![旅客端](img/Traveller%20dashboard.png)
+
+### 运营端总览
+
+![运营端总览](img/Operations%20dashboard%201.png)
+
+### 历史客流
+
+![历史客流](img/Operations%20dashboard%202.png)
+
+### 模拟分钟客流与官方每日统计
+
+![模拟分钟客流与官方每日统计](img/Operations%20dashboard%203.png)
+
+### 演示旅客查询、过关记录与排队模拟
+
+![演示旅客查询、过关记录与排队模拟](img/Operations%20dashboard%204.png)
+
+### 车辆配额预约与数据库实验室
+
+![车辆配额预约与数据库实验室](img/Operations%20dashboard%205.png)
+
 ## 在 Windows 本机运行
 
 启动 Docker Desktop，在包含 `compose.yaml` 的项目目录打开 PowerShell，运行：
