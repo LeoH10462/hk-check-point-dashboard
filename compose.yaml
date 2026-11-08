@@ -23,6 +23,7 @@ services:
       DB_DATABASE: borderflow
       DB_USERNAME: borderflow
       DB_PASSWORD: ${DB_PASSWORD:-borderflow_local}
+      OPERATOR_USERNAME: ${OPERATOR_USERNAME:-operator}
       OPERATOR_PASSWORD: ${OPERATOR_PASSWORD:?Set OPERATOR_PASSWORD in .env}
       SESSION_DRIVER: file
       CACHE_STORE: file

@@ -12,7 +12,7 @@ async function request(path, data, expected = 200, updateCookies = false) {
         headers['Content-Type'] = 'application/json';
         headers['X-CSRF-TOKEN'] = csrf;
     }
-    const response = await fetch(url+path,{headers,method:data ? 'POST':'GET',body:data ? JSON.stringify(data):undefined});
+    const response = await fetch(url+path,{headers,method:data ? 'POST':'GET',body:data ? JSON.stringify(data):undefined,redirect:'manual'});
     if (updateCookies) {
         for (const cookie of response.headers.getSetCookie()) {
             const pair = cookie.split(';')[0];
@@ -27,10 +27,31 @@ async function request(path, data, expected = 200, updateCookies = false) {
 await request('/api/ops/travellers',null,401);
 await request('/api/ops/travellers/1',null,401);
 const guest = await request('/operations',null,200,true);
-csrf = guest.body.match(/name="csrf-token" content="([^"]+)"/)[1];
-csrf = (await request('/api/login',{password},200,true)).body.csrf;
+assert.match(guest.body, /<html lang="en">/);
+assert.match(guest.body, /name="username"/);
+const cantonese = await request('/?lang=zh-HK',null,200,true);
+assert.match(cantonese.body, /<html lang="zh-HK">/);
+assert.match(cantonese.body, /口岸等候概況/);
+await request('/operations/checkpoints/LWS',null,302);
+csrf = cantonese.body.match(/name="csrf-token" content="([^"]+)"/)[1];
+await request('/api/login',{username:'incorrect-account',password},401);
+csrf = (await request('/api/login',{username:process.env.OPERATOR_USERNAME || 'operator',password},200,true)).body.csrf;
 const publicData = (await request('/api/checkpoints?direction=Arrival&audience=R')).body;
-assert.ok(publicData.points.some(point => point.code === 'LWS'));
+assert.equal(publicData.points.find(point => point.code === 'LWS').chinese,'羅湖');
+assert.equal(publicData.points.find(point => point.code === 'LWS').transport,'港鐵東鐵綫');
+assert.equal((await request('/api/ops/travellers/2')).body.profile.display_name,'示範旅客 02');
+const minute = (await request('/api/ops/checkpoints/LWS/minute')).body;
+assert.match(minute.minute,/^\d{4}-\d\d-\d\d \d\d:\d\d$/);
+assert.equal(minute.source,'simulation');
+assert.ok(minute.arrivals >= 0 && minute.departures >= 0);
+const detail = (await request('/api/ops/checkpoints/LWS/details')).body;
+assert.equal(detail.lastSeven.length,7);
+assert.equal(detail.lastSeven.at(-1).day,detail.date);
+assert.ok(detail.history.length > 0);
+const page = await request('/operations/checkpoints/LWS');
+assert.match(page.body,/id="toggle-crossings"/);
+const crossings = (await request('/api/ops/crossings?code=LWS&day='+detail.date)).body;
+assert.ok(crossings.every(row => row.name === 'Lo Wu' && row.occurred_at.startsWith(detail.date)));
 assert.ok(publicData.points.every(point => !('lanes' in point)));
 const history = (await request('/api/history?direction=Arrival&code=LWS')).body;
 assert.equal(history.length,28,'Import official daily data before running');

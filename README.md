@@ -25,9 +25,15 @@ docker compose up -d --build
 powershell -ExecutionPolicy Bypass -File .\scripts\import-traffic.ps1
 ```
 
-在 `.env` 設定至少 12 個字元的 `OPERATOR_PASSWORD` 後再執行 Compose。旅客端為 [localhost:8000](http://localhost:8000)，營運端為 [localhost:8000/operations](http://localhost:8000/operations)。Compose 預設只綁定本機。第一次建置需要下載 Docker 映像與 Composer 套件。若 Windows 指令碼政策阻止執行匯入指令，可從 PowerShell 以 `powershell -ExecutionPolicy Bypass -File scripts/import-traffic.ps1` 執行該單一指令碼。
+在 `.env` 設定至少 12 個字元的 `OPERATOR_PASSWORD` 後再執行 Compose。營運帳戶預設為 `operator`，可透過 `OPERATOR_USERNAME` 修改。旅客端為 [localhost:8000](http://localhost:8000)，營運端為 [localhost:8000/operations](http://localhost:8000/operations)。Compose 預設只綁定本機。第一次建置需要下載 Docker 映像與 Composer 套件。若 Windows 指令碼政策阻止執行匯入指令，可從 PowerShell 以 `powershell -ExecutionPolicy Bypass -File scripts/import-traffic.ps1` 執行該單一指令碼。
 
 `docker compose down` 停止服務並保留 MySQL 資料。初始化 SQL 會在建立空資料庫時依檔名順序執行。
+
+### 更新既有資料庫
+
+更新程式後，在運行中的 Compose 專案執行 `powershell -ExecutionPolicy Bypass -File .\scripts\upgrade-utf8.ps1`，修正早期版本的中文種子資料。此步驟保留已匯入的流量、預約和模擬情景。
+
+介面預設英文，右上角的 CN 可切換至香港繁體中文。營運端的分鐘流量是模擬值，口岸明細的每日數據來自官方 CSV，今日出入境旅客表來自示範過關流水。
 
 ## 功能分區
 

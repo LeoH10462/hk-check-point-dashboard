@@ -8,10 +8,19 @@ use Illuminate\Support\Facades\Route;
 
 Route::get('/', fn() => view('dashboard', ['operator'=>false]));
 Route::get('/operations', fn() => view('dashboard', ['operator'=>true]));
+Route::get('/operations/checkpoints/{code}', function (string $code) {
+    if (!session('operator')) {
+        return redirect('/operations');
+    }
+    abort_unless(DB::table('checkpoint')->where('code',$code)->exists(),404);
+    return response()->view('dashboard',['operator'=>true,'detailCode'=>$code])->header('Cache-Control','no-store');
+});
 Route::post('/api/login', function (Request $request) {
-    $password = $request->validate(['password'=>'required|string|max:256'])['password'];
+    $credentials = $request->validate(['username'=>'required|string|max:80','password'=>'required|string|max:256']);
+    $username = (string) config('borderflow.operator_username');
+    $password = $credentials['password'];
     $expected = config('borderflow.operator_password');
-    abort_unless(is_string($expected) && strlen($expected) >= 12 && hash_equals($expected, $password), 401, '登入失敗');
+    abort_unless(is_string($expected) && strlen($expected) >= 12 && hash_equals($username, $credentials['username']) && hash_equals($expected, $password), 401, '登入失敗');
     $request->session()->regenerate();
     $request->session()->put('operator', true);
     return ['csrf'=>csrf_token()];
@@ -37,7 +46,7 @@ Route::get('/api/checkpoints', function (Request $request) {
         $official = null;
     }
     $field = $input['direction'] === 'Arrival' ? 'arrQueue' : 'depQueue';
-    $points = DB::table('checkpoint')->whereNotNull('chinese')->orderBy('code')->get();
+    $points = DB::table('checkpoint')->whereNotNull('transport')->orderBy('code')->get();
     foreach ($points as $point) {
         unset($point->lanes);
         $point->status = $official['data'][$point->code][$field] ?? null;
@@ -63,8 +72,34 @@ Route::middleware(\App\OperatorOnly::class)->prefix('/api/ops')->group(function 
         $crossings = DB::table('crossing')->where('traveller_id',$id);
         return ['profile'=>$traveller,'count'=>(clone $crossings)->count(),
             'crossings'=>$crossings->join('checkpoint','checkpoint.code','=','crossing.checkpoint_code')
-                ->orderByDesc('occurred_at')->limit(100)->get(['checkpoint.chinese','occurred_at','direction'])];
+                ->orderByDesc('occurred_at')->limit(100)->get(['checkpoint.name','checkpoint.chinese','occurred_at','direction'])];
     })->whereNumber('id');
+    Route::get('/checkpoints', fn() => DB::table('checkpoint')->orderBy('name')->get(['code','name','chinese']));
+    Route::get('/checkpoints/{code}/minute', function (string $code) {
+        $point = DB::table('checkpoint')->where('code',$code)->first();
+        abort_unless($point,404);
+        $minute = now()->startOfMinute();
+        $stamp = $minute->format('Y-m-d H:i');
+        return ['minute'=>$stamp,'source'=>'simulation',
+            'arrivals'=>crc32($code.$stamp.'arrival') % ($point->lanes * 4 + 1),
+            'departures'=>crc32($code.$stamp.'departure') % ($point->lanes * 4 + 1)];
+    });
+    Route::get('/checkpoints/{code}/details', function (string $code) {
+        $point = DB::table('checkpoint')->where('code',$code)->first(['code','name','chinese']);
+        abort_unless($point,404);
+        $today = now()->startOfDay();
+        $history = DB::table('daily_traffic')->where('checkpoint_code',$code)->groupBy('day')
+            ->selectRaw("day, MAX(IF(direction='Arrival',total,NULL)) AS arrivals, MAX(IF(direction='Departure',total,NULL)) AS departures")
+            ->orderByDesc('day')->limit(30)->get();
+        $byDay = $history->keyBy('day');
+        $lastSeven = [];
+        for ($days=6; $days>=0; $days--) {
+            $day = $today->copy()->subDays($days)->toDateString();
+            $lastSeven[] = $byDay->get($day) ?? ['day'=>$day,'arrivals'=>null,'departures'=>null];
+        }
+        return ['point'=>$point,'date'=>$today->toDateString(),'today'=>$byDay->get($today->toDateString()),
+            'history'=>$history,'lastSeven'=>$lastSeven];
+    });
     Route::get('/database-lab', function () {
         $day = DB::table('daily_traffic')->max('day');
         if (!$day) {
@@ -92,13 +127,13 @@ Route::middleware(\App\OperatorOnly::class)->prefix('/api/ops')->group(function 
         if (!empty($input['direction'])) {
             $query->where('x.direction',$input['direction']);
         }
-        return $query->orderByDesc('x.occurred_at')->limit(100)->get(['t.id','t.display_name','c.chinese','x.occurred_at','x.direction']);
+        return $query->orderByDesc('x.occurred_at')->limit(100)->get(['t.id','t.display_name','t.demo_document','c.name','c.chinese','x.occurred_at','x.direction']);
     });
     Route::get('/statistics', function () {
         $day = DB::table('daily_traffic')->max('day');
         return ['day'=>$day, 'rows'=>DB::table('daily_traffic as t')->join('checkpoint as c','c.code','=','t.checkpoint_code')
-            ->where('t.day',$day)->groupBy('c.name','c.chinese')
-            ->selectRaw("COALESCE(c.chinese,c.name) AS name, SUM(IF(t.direction='Arrival',t.total,0)) AS arrivals, SUM(IF(t.direction='Departure',t.total,0)) AS departures")
+            ->where('t.day',$day)->groupBy('c.code','c.name','c.chinese')
+            ->selectRaw("c.code, c.name, c.chinese, SUM(IF(t.direction='Arrival',t.total,0)) AS arrivals, SUM(IF(t.direction='Departure',t.total,0)) AS departures")
             ->orderByDesc('arrivals')->get()];
     });
     Route::post('/simulations', function (Request $request) {

@@ -1,3 +1,4 @@
+SET NAMES utf8mb4;
 INSERT INTO checkpoint(code,name,chinese,transport,lanes) VALUES
 ('LWS','Lo Wu','羅湖','港鐵東鐵綫',16),('LSC','Lok Ma Chau Spur Line','落馬洲支線','港鐵東鐵綫',14),
 ('MKT','Man Kam To','文錦渡','跨境巴士',5),('SBC','Shenzhen Bay','深圳灣','專營巴士／跨境巴士',12),
