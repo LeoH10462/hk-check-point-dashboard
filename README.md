@@ -1,13 +1,14 @@
-# BorderFlow 香港口岸出行與營運控制台
+# BorderFlow · Hong Kong Checkpoint Dashboard
 
-BorderFlow 是 CityU 的資料庫應用課程專案。旅客端查看入境事務處等候級別、交通接駁方式和歷史客流。營運端提供受密碼保護的虛構旅客與過關流水、車輛配額、排隊壓力測試與 SQL 執行計畫。
+**EN** | [CN · 简体中文](README.zh-CN.md)
 
-## 本機啟動
+BorderFlow is a CityU database application project. The traveller dashboard shows official checkpoint wait categories, transport connections and historical passenger traffic. The password-protected operations dashboard adds demo traveller records, vehicle quota bookings, queue simulations and MySQL execution plans.
 
-需要 Docker Desktop 與網絡連線。在 Windows PowerShell 進入專案資料夾後執行：
+## Run locally on Windows
+
+Start Docker Desktop. Open PowerShell in the project folder that contains `compose.yaml` and run:
 
 ```powershell
-# 先進入含有 compose.yaml 的專案資料夾
 if (-not (Test-Path .env)) {
     Copy-Item .env.example .env
 }
@@ -20,47 +21,49 @@ if (Select-String -LiteralPath .env -Pattern '^APP_KEY=$' -Quiet) {
         Set-Content -LiteralPath .env -Encoding ASCII
 }
 notepad .env
-# 儲存並關閉記事本後，再執行下列兩行
+```
+
+Set `OPERATOR_PASSWORD` to at least 12 characters in `.env`, then save and close Notepad. The default account is `operator`. To use a different account, set `OPERATOR_USERNAME`.
+
+```powershell
 docker compose up -d --build
 powershell -ExecutionPolicy Bypass -File .\scripts\import-traffic.ps1
 ```
 
-在 `.env` 設定至少 12 個字元的 `OPERATOR_PASSWORD` 後再執行 Compose。營運帳戶預設為 `operator`，可透過 `OPERATOR_USERNAME` 修改。旅客端為 [localhost:8000](http://localhost:8000)，營運端為 [localhost:8000/operations](http://localhost:8000/operations)。Compose 預設只綁定本機。第一次建置需要下載 Docker 映像與 Composer 套件。若 Windows 指令碼政策阻止執行匯入指令，可從 PowerShell 以 `powershell -ExecutionPolicy Bypass -File scripts/import-traffic.ps1` 執行該單一指令碼。
+Open the [traveller dashboard](http://127.0.0.1:8000/) or the [operations dashboard](http://127.0.0.1:8000/operations). The first build downloads Docker images and Composer dependencies. On the same computer, once the images and data are ready, use `docker compose up -d --no-build --pull never` to start the existing deployment. Use `docker compose down` to stop it and retain the MySQL data.
 
-`docker compose down` 停止服務並保留 MySQL 資料。初始化 SQL 會在建立空資料庫時依檔名順序執行。
+### Upgrade an existing database
 
-### 更新既有資料庫
+After updating the application, run `powershell -ExecutionPolicy Bypass -File .\scripts\upgrade-utf8.ps1` with the Compose project running. This repairs Chinese seed text and applies checkpoint name updates while preserving imported traffic, bookings and simulation scenarios.
 
-更新程式後，在運行中的 Compose 專案執行 `powershell -ExecutionPolicy Bypass -File .\scripts\upgrade-utf8.ps1`，修正早期版本的中文種子資料。此步驟保留已匯入的流量、預約和模擬情景。
+## Features
 
-介面預設英文，右上角的 CN 可切換至香港繁體中文。營運端的分鐘流量是模擬值，口岸明細的每日數據來自官方 CSV，今日出入境旅客表來自示範過關流水。
+| Area | What you can do |
+| --- | --- |
+| Traveller dashboard | Compare checkpoint wait categories, switch direction and traveller type, and view transport connections and historical traffic |
+| Operations dashboard | Review daily official figures, checkpoint details and seven-day trends. Filter demo travellers and crossings, and view simulated minute-by-minute flows |
+| Queue simulation | Set arrival growth, open lanes and the initial queue. Compare a 60-minute scenario with its baseline and replay saved results |
+| Quota bookings | Create demo vehicle bookings with daily and time-slot limits, deadlines, cancellation and an audit trail |
+| Database lab | Use `EXPLAIN ANALYZE` to compare the same query with and without a date index |
 
-## 功能分區
+The website opens in English. Its **CN** switch displays Hong Kong Traditional Chinese. This README has a separate Simplified Chinese edition.
 
-| 區域 | 功能 |
-|---|---|
-| 旅客出行 | 入境／離境、居民／訪客切換，官方等待級別與較低等待級別的口岸比較，接駁交通方式與 28 筆每日客流走勢 |
-| 營運控制台 | 上述口岸資訊、最新官方日報、虛構旅客檔案及過關記錄、過關流水篩選 |
-| 壓力測試 | 60 分鐘到達量爬升、通道容量和初始隊列設定、基準曲線、分鐘回放與情景留存 |
-| 配額預約 | 演示車輛預約、日／時段配額、狀態與截止時間檢查、取消後釋放配額、稽核記錄 |
-| 資料庫實驗室 | 以 `EXPLAIN ANALYZE` 比較同一查詢忽略與使用日期索引的計畫 |
+## Data sources
 
-## 資料來源
+- Daily passenger traffic and pre-2021 festive-period figures come from the Hong Kong Immigration Department. The import can be run again to refresh the records. [Daily passenger traffic](https://data.gov.hk/en-data/dataset/hk-immd-set5-statistics-daily-passenger-traffic) · [Festive-period traffic](https://data.gov.hk/en-data/dataset/hk-immd-set5-statistics-passenger-traffic-festive-period)
+- Official checkpoint wait categories come from the Immigration Department's waiting-time feed. [Land boundary checkpoint waiting times](https://data.gov.hk/en-data/dataset/hk-immd-set28-land-boundary-control-points-waiting-time)
+- Minute-level flow, traveller identities, review notes, crossings, vehicles and bookings are demo data.
 
-- [香港入境事務處每日客流](https://data.gov.hk/en-data/dataset/hk-immd-set5-statistics-daily-passenger-traffic) 與 [節日客流](https://data.gov.hk/en-data/dataset/hk-immd-set5-statistics-passenger-traffic-festive-period)。匯入指令可重跑，節日資料僅取 2021 年前的記錄。歷史圖使用每日總人次。
-- [陸路口岸等候狀態](https://data.gov.hk/en-data/dataset/hk-immd-set28-land-boundary-control-points-waiting-time)。資料服務每 15 分鐘更新，頁面每分鐘刷新，後端快取五分鐘。畫面顯示本系統擷取時間和官方級別。服務中斷時顯示暫不可用。
-- 所有個人身分、覆核備註、過關流水、車輛及預約均為課程示範。模擬參數為情景假設，接駁資料展示交通方式。
-
-## 驗證
+## Verify the project
 
 ```powershell
 docker compose exec app php artisan traffic:reconcile LWS 2025-09-01
-$env:OPERATOR_PASSWORD = Read-Host '輸入 .env 裡的營運密碼'
+$env:OPERATOR_PASSWORD = Read-Host 'Enter the operator password from .env'
 node tests/smoke.mjs
 ```
 
-測試需要 Node.js 22+ 和新建的演示資料庫。測試對同一天的兩個時段同時發出 200 個預約請求，預期接納 8 個，隨後取消已建立的測試預約。各筆記錄仍留在稽核表。
+The smoke test needs Node.js 22+ and a demo database with available quotas. If you changed the operator account, set the matching `OPERATOR_USERNAME` in PowerShell. The test submits 200 requests across two slots on one day, expects eight successful bookings and cancels the test bookings afterward. Audit records are retained.
 
-- [技術報告](docs/report.md)
-- [錄影流程](docs/demo-script.md)
-- [PDF 版本](docs/BorderFlow-report.pdf)
+- [Technical report](docs/report.md)
+- [Demo recording outline](docs/demo-script.md)
+- [Technical report PDF](docs/BorderFlow-report.pdf)
