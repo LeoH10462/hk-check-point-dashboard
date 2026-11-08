@@ -1,0 +1,4 @@
+{
+  "name": "borderflow/checkpoint-dashboard",
+  "autoload": {"psr-4": {"App\\": "app/"}}, "require": {"php": "^8.3", "laravel/framework": "^12.0"}
+}
