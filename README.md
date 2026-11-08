@@ -7,12 +7,22 @@ BorderFlow 是 CityU 的資料庫應用課程專案。旅客端查看入境事�
 需要 Docker Desktop 與網絡連線。在 Windows PowerShell 進入專案資料夾後執行：
 
 ```powershell
-Copy-Item .env.example .env
-$key = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
-(Get-Content .env) -replace '^APP_KEY=$', "APP_KEY=base64:$key" | Set-Content .env
+# 先進入含有 compose.yaml 的專案資料夾
+if (-not (Test-Path .env)) {
+    Copy-Item .env.example .env
+}
+if (Select-String -LiteralPath .env -Pattern '^APP_KEY=$' -Quiet) {
+    $bytes = New-Object byte[] 32
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    $key = [Convert]::ToBase64String($bytes)
+    (Get-Content .env) -replace '^APP_KEY=$', "APP_KEY=base64:$key" |
+        Set-Content -LiteralPath .env -Encoding ASCII
+}
 notepad .env
+# 儲存並關閉記事本後，再執行下列兩行
 docker compose up -d --build
-./scripts/import-traffic.ps1
+powershell -ExecutionPolicy Bypass -File .\scripts\import-traffic.ps1
 ```
 
 在 `.env` 設定至少 12 個字元的 `OPERATOR_PASSWORD` 後再執行 Compose。旅客端為 [localhost:8000](http://localhost:8000)，營運端為 [localhost:8000/operations](http://localhost:8000/operations)。Compose 預設只綁定本機。第一次建置需要下載 Docker 映像與 Composer 套件。若 Windows 指令碼政策阻止執行匯入指令，可從 PowerShell 以 `powershell -ExecutionPolicy Bypass -File scripts/import-traffic.ps1` 執行該單一指令碼。
